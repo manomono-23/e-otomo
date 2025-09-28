@@ -211,7 +211,7 @@ void setupBluetooth() {
 
   // Initialize Bluefruit with maximum performance configuration
   Bluefruit.begin();
-  Bluefruit.setName("Otomo-e");
+  Bluefruit.setName("Otomo-e 3C");
 
   // Set connection callbacks for sleep management
   Bluefruit.Periph.setConnectCallback([](uint16_t conn_handle) {
