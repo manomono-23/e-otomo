@@ -1,0 +1,45 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# KiCad temporary files and caches
+*-backups/
+*-rescue.lib
+*-rescue.dcm
+*-cache.lib
+*-cache.dcm
+*.bak
+*.kicad_prl
+fp-info-cache
+*.step.tmp
+
+# KiCad production files (keep only essential ones)
+production/
+fabrication/
+gerber/
+drill/
+
+# 3D printing temp files
+*.gcode
+*.3mf
+
+# Arduino IDE
+*.hex
+*.elf
+*.bin
+
+# Visual Studio Code
+.vscode/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Logs
+*.log
