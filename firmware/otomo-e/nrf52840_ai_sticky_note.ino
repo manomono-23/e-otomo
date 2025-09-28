@@ -85,11 +85,13 @@ bool rleDataInProgress = false;
 uint8_t rleDisplayMode = 4; // Default to 4-color mode
 
 // BLE Service and Characteristic UUIDs
-#define AI_STICKY_SERVICE_UUID    "12345678-1234-5678-9abc-123456789abc"
-#define DRAWING_DATA_CHAR_UUID    "87654321-4321-8765-cba9-987654321abc"
+// UUID will be generated at runtime
+String serviceUuidString;
+String characteristicUuidString;
 
 // Function prototypes
 void setupBluetooth();
+String generateRandomUUID();
 void processDrawingData();
 void processCommand(uint8_t* data, size_t length);
 void showWelcomeMessage();
@@ -146,6 +148,15 @@ void setup() {
     Serial.println("Short press detected - skipping display update");
   }
   
+  // Generate random UUIDs for this session
+  randomSeed(analogRead(A0) + millis()); // Better random seed
+  serviceUuidString = generateRandomUUID();
+  characteristicUuidString = generateRandomUUID();
+
+  Serial.println("Generated UUIDs:");
+  Serial.println("Service UUID: " + serviceUuidString);
+  Serial.println("Characteristic UUID: " + characteristicUuidString);
+
   // Setup Bluetooth
   setupBluetooth();
 
@@ -234,12 +245,12 @@ void setupBluetooth() {
   // Request 2M PHY for higher throughput (if supported)
   // Note: PHY switching is handled automatically by the BLE stack
   
-  // Configure and start the BLE service with proper UUID
-  aiStickyService = BLEService(BLEUuid(AI_STICKY_SERVICE_UUID));
+  // Configure and start the BLE service with random UUID
+  aiStickyService = BLEService(BLEUuid(serviceUuidString.c_str()));
   aiStickyService.begin();
-  
-  // Configure the drawing data characteristic with maximum throughput settings
-  drawingDataChar = BLECharacteristic(BLEUuid(DRAWING_DATA_CHAR_UUID));
+
+  // Configure the drawing data characteristic with random UUID
+  drawingDataChar = BLECharacteristic(BLEUuid(characteristicUuidString.c_str()));
   drawingDataChar.setProperties(CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP);
   drawingDataChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
   drawingDataChar.setMaxLen(244); // Use BLE 4.2 maximum (244 bytes payload + 3 bytes header = 247)
@@ -759,4 +770,24 @@ void decompressRLEToDrawingData(uint8_t* rleData, size_t dataLength, uint8_t dis
   }
 
   Serial.printf("RLE decompressed %d pixels from %d bytes\n", pixelIndex, dataLength);
+}
+
+String generateRandomUUID() {
+  // Generate a random UUID in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  String uuid = "";
+
+  for (int i = 0; i < 32; i++) {
+    if (i == 8 || i == 12 || i == 16 || i == 20) {
+      uuid += "-";
+    }
+    // Generate random hex digit (0-9, a-f)
+    uint8_t randomByte = random(16);
+    if (randomByte < 10) {
+      uuid += String(randomByte);
+    } else {
+      uuid += char('a' + randomByte - 10);
+    }
+  }
+
+  return uuid;
 }
