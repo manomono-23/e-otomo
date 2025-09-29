@@ -1,13 +1,23 @@
 /**
  * AI Sticky Note with Bluetooth Support for nRF52840
  * nRF52840 + Waveshare 1.54inch e-Paper Module (B)
- * 
+ *
  * Features:
  * - Bluetooth communication for receiving 200x200 drawing data
- * - 3-color e-paper display (Black/White/Red)
+ * - 2-color or 3-color e-paper display (configurable)
  * - Deep sleep with button wake-up
  * - LED status indicator
- * 
+ */
+
+// ========== CONFIGURATION ==========
+// Display type selection (uncomment one)
+// #define DISPLAY_2COLOR  // 2-color display (Black/White)
+ #define DISPLAY_3COLOR  // 3-color display (Black/White/Red)
+
+// Device ID (change this for each device)
+#define DEVICE_ID "0002"
+
+/**
  * Pin Configuration:
  * nRF52840 → e-Paper Module / LED / Switch
  * 3V3  → VCC
@@ -22,7 +32,12 @@
  * D2   → Push Switch → 3.3V (Wake up from deep sleep)
  */
 
-#include <GxEPD2_3C.h>
+#ifdef DISPLAY_2COLOR
+  #include <GxEPD2_BW.h>  // 2-color display library
+#elif defined(DISPLAY_3COLOR)
+  #include <GxEPD2_3C.h>  // 3-color display library
+#endif
+
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include <SPI.h>
 #include <bluefruit.h>
@@ -37,8 +52,14 @@
 // Blue LED is built-in LED_BLUE pin (P0.06 on XIAO nRF52840)
 #define SWITCH_PIN  D2  // Push Switch (Wake up)
 
-// Display constructor for 1.54" 3-color (Black/White/Red)
-GxEPD2_3C<GxEPD2_154_Z90c, GxEPD2_154_Z90c::HEIGHT> display(GxEPD2_154_Z90c(CS_PIN, DC_PIN, RST_PIN, BUSY_PIN));
+// Display constructor (conditional based on display type)
+#ifdef DISPLAY_2COLOR
+  // 2-color display (Black/White)
+  GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(GxEPD2_154_D67(CS_PIN, DC_PIN, RST_PIN, BUSY_PIN));
+#elif defined(DISPLAY_3COLOR)
+  // 3-color display (Black/White/Red)
+  GxEPD2_3C<GxEPD2_154_Z90c, GxEPD2_154_Z90c::HEIGHT> display(GxEPD2_154_Z90c(CS_PIN, DC_PIN, RST_PIN, BUSY_PIN));
+#endif
 
 // LED control variables
 volatile bool displayUpdating = false;
@@ -84,14 +105,13 @@ uint16_t expectedRLELength = 0;
 bool rleDataInProgress = false;
 uint8_t rleDisplayMode = 4; // Default to 4-color mode
 
-// BLE Service and Characteristic UUIDs
-// UUID will be generated at runtime
-String serviceUuidString;
-String characteristicUuidString;
+// BLE Service and Characteristic UUIDs (Fixed)
+const char* SERVICE_UUID = "12345678-1234-5678-9abc-123456789abd";
+const char* CHARACTERISTIC_UUID = "87654321-4321-8765-cba9-987654321abd";
+
 
 // Function prototypes
 void setupBluetooth();
-String generateRandomUUID();
 void processDrawingData();
 void processCommand(uint8_t* data, size_t length);
 void showWelcomeMessage();
@@ -148,14 +168,10 @@ void setup() {
     Serial.println("Short press detected - skipping display update");
   }
   
-  // Generate random UUIDs for this session
-  randomSeed(analogRead(A0) + millis()); // Better random seed
-  serviceUuidString = generateRandomUUID();
-  characteristicUuidString = generateRandomUUID();
-
-  Serial.println("Generated UUIDs:");
-  Serial.println("Service UUID: " + serviceUuidString);
-  Serial.println("Characteristic UUID: " + characteristicUuidString);
+  Serial.println("Device initialization:");
+  Serial.printf("Device ID: %s\n", DEVICE_ID);
+  Serial.printf("Service UUID: %s\n", SERVICE_UUID);
+  Serial.printf("Characteristic UUID: %s\n", CHARACTERISTIC_UUID);
 
   // Setup Bluetooth
   setupBluetooth();
@@ -222,7 +238,18 @@ void setupBluetooth() {
 
   // Initialize Bluefruit with maximum performance configuration
   Bluefruit.begin();
-  Bluefruit.setName("Otomo-e 3C");
+  // Set device name with unique ID
+  String deviceName;
+#ifdef DISPLAY_2COLOR
+  deviceName = "Otomoe2C " + String(DEVICE_ID);
+#elif defined(DISPLAY_3COLOR)
+  deviceName = "Otomoe3C " + String(DEVICE_ID);
+#else
+  #error "Please define either DISPLAY_2COLOR or DISPLAY_3COLOR"
+#endif
+
+  Bluefruit.setName(deviceName.c_str());
+  Serial.printf("BLE Device Name: %s\n", deviceName.c_str());
 
   // Set connection callbacks for sleep management
   Bluefruit.Periph.setConnectCallback([](uint16_t conn_handle) {
@@ -245,12 +272,12 @@ void setupBluetooth() {
   // Request 2M PHY for higher throughput (if supported)
   // Note: PHY switching is handled automatically by the BLE stack
   
-  // Configure and start the BLE service with random UUID
-  aiStickyService = BLEService(BLEUuid(serviceUuidString.c_str()));
+  // Configure and start the BLE service with compile-time UUID
+  aiStickyService = BLEService(BLEUuid(SERVICE_UUID));
   aiStickyService.begin();
 
-  // Configure the drawing data characteristic with random UUID
-  drawingDataChar = BLECharacteristic(BLEUuid(characteristicUuidString.c_str()));
+  // Configure the drawing data characteristic with compile-time UUID
+  drawingDataChar = BLECharacteristic(BLEUuid(CHARACTERISTIC_UUID));
   drawingDataChar.setProperties(CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP);
   drawingDataChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
   drawingDataChar.setMaxLen(244); // Use BLE 4.2 maximum (244 bytes payload + 3 bytes header = 247)
@@ -269,8 +296,8 @@ void setupBluetooth() {
   Bluefruit.Advertising.start(0); // 0 = Don't stop advertising
   
   Serial.println("Bluetooth LE advertising started");
-  Serial.printf("Service UUID: %s\n", AI_STICKY_SERVICE_UUID);
-  Serial.printf("Characteristic UUID: %s\n", DRAWING_DATA_CHAR_UUID);
+  Serial.printf("Service UUID: %s\n", SERVICE_UUID);
+  Serial.printf("Characteristic UUID: %s\n", CHARACTERISTIC_UUID);
   Serial.println("Waiting for client connection...");
 }
 
@@ -289,6 +316,7 @@ void drawingDataWriteCallback(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t
   }
 }
 
+
 void processDrawingData() {
   Serial.println("Converting drawing data to display format with 180-degree rotation...");
 
@@ -299,8 +327,25 @@ void processDrawingData() {
   do {
     display.fillScreen(GxEPD_WHITE);
 
-    // Convert received data to display pixels with 180-degree rotation
-    // Data format: 2 bits per pixel (00=white, 01=black, 10=red)
+    // Convert received data to display pixels
+#ifdef DISPLAY_2COLOR
+    // 2-color mode: 1 bit per pixel (0=white, 1=black)
+    for (int y = 0; y < 200; y++) {
+      for (int x = 0; x < 200; x++) {
+        int pixelIndex = y * 200 + x;
+        int byteIndex = pixelIndex / 8;
+        int bitOffset = pixelIndex % 8;
+
+        if (byteIndex < sizeof(drawingData)) {
+          uint8_t pixelValue = (drawingData[byteIndex] >> bitOffset) & 0x01;
+          if (pixelValue == 1) {
+            display.drawPixel(x, y, GxEPD_BLACK);
+          }
+        }
+      }
+    }
+#else
+    // 3-color mode: 2 bits per pixel (00=white, 01=black, 10=red)
     for (int y = 0; y < 200; y++) {
       for (int x = 0; x < 200; x++) {
         int pixelIndex = y * 200 + x;
@@ -310,7 +355,6 @@ void processDrawingData() {
         if (byteIndex < sizeof(drawingData)) {
           uint8_t pixelValue = (drawingData[byteIndex] >> bitOffset) & 0x03;
 
-          // Use original coordinates (rotation handled by setRotation(2))
           switch (pixelValue) {
             case 0x01: // Black
               display.drawPixel(x, y, GxEPD_BLACK);
@@ -326,6 +370,7 @@ void processDrawingData() {
         }
       }
     }
+#endif
 
   } while (display.nextPage());
 
@@ -410,12 +455,19 @@ void processCommand(uint8_t* data, size_t length) {
     Serial.printf("Receiving: +%d bytes (%d/%d)\n", (int)copyLen, dataReceiveOffset, (int)sizeof(drawingData));
     #endif
     
-    if (dataReceiveOffset >= sizeof(drawingData)) {
+    // Check completion based on actual expected data size
+#ifdef DISPLAY_2COLOR
+    int expectedDataSize = 5000;  // 200*200/8 = 5000 bytes for 2-color
+#else
+    int expectedDataSize = 10000; // 200*200*2/8 = 10000 bytes for 3-color
+#endif
+
+    if (dataReceiveOffset >= expectedDataSize) {
       newDataReceived = true;
       dataReceiveOffset = 0;
       drawingInProgress = false;
       displayUpdating = false;
-      Serial.println("Drawing data complete");
+      Serial.printf("Drawing data complete: received %d bytes (expected %d)\n", dataReceiveOffset, expectedDataSize);
     }
     return;
   }
@@ -437,13 +489,13 @@ void processCommand(uint8_t* data, size_t length) {
       drawingInProgress = true;
       displayUpdating = true;
       
-      // Copy payload after header
-      if (length > 1) {
+      // Copy payload after header (skip command type + display mode = 2 bytes)
+      if (length > 2) {
         size_t remaining = sizeof(drawingData) - dataReceiveOffset;
-        size_t chunkLen = length - 1;
+        size_t chunkLen = length - 2;  // Skip 2-byte header
         size_t copyLen = chunkLen < remaining ? chunkLen : remaining;
         if (copyLen > 0) {
-          memcpy(drawingData + dataReceiveOffset, data + 1, copyLen);
+          memcpy(drawingData + dataReceiveOffset, data + 2, copyLen);  // Start from data[2]
           dataReceiveOffset += copyLen;
         }
       }
@@ -561,7 +613,21 @@ void showWelcomeMessage() {
   do {
     display.fillScreen(GxEPD_WHITE);
 
-    // Draw 190x190 QR code at top
+    // Draw device ID at top center in black
+    display.setFont(&FreeMonoBold9pt7b);
+    display.setTextColor(GxEPD_BLACK);
+
+    // Calculate center position for device ID
+    String deviceId = String(DEVICE_ID);
+    int16_t tbx, tby; uint16_t tbw, tbh;
+    display.getTextBounds(deviceId.c_str(), 0, 0, &tbx, &tby, &tbw, &tbh);
+    int16_t x = (200 - tbw) / 2;
+    int16_t y = 20; // Top margin
+
+    display.setCursor(x, y);
+    display.print(deviceId);
+
+    // Draw QR code moved down (start at y=30)
     drawQRCode();
 
     // Draw 3-color stripe at bottom (195-200, full width)
@@ -572,7 +638,9 @@ void showWelcomeMessage() {
         } else if (x < 134) {
           // White stripe (default background, no drawing needed)
         } else {
-          display.drawPixel(x, y, GxEPD_RED);    // Red stripe
+#ifdef DISPLAY_3COLOR
+          display.drawPixel(x, y, GxEPD_RED);    // Red stripe (3-color only)
+#endif
         }
       }
     }
@@ -584,10 +652,10 @@ void showWelcomeMessage() {
 }
 
 void drawQRCode() {
-  // QR Code parameters - larger display
-  const uint8_t qr_scale = 6;  // Each QR pixel is 6x6 display pixels (33*6=198)
-  const uint8_t qr_x = 1;      // X position to fit 198px QR in 200px width
-  const uint8_t qr_y = 1;      // Y position at top
+  // QR Code parameters - larger display with device ID at top
+  const uint8_t qr_scale = 6;  // Larger scale (33*6=198)
+  const uint8_t qr_x = (200 - 198) / 2;  // Center horizontally (1px margin)
+  const uint8_t qr_y = 10;     // Y position close to device ID
 
 
   // Draw the QR code
@@ -772,22 +840,3 @@ void decompressRLEToDrawingData(uint8_t* rleData, size_t dataLength, uint8_t dis
   Serial.printf("RLE decompressed %d pixels from %d bytes\n", pixelIndex, dataLength);
 }
 
-String generateRandomUUID() {
-  // Generate a random UUID in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  String uuid = "";
-
-  for (int i = 0; i < 32; i++) {
-    if (i == 8 || i == 12 || i == 16 || i == 20) {
-      uuid += "-";
-    }
-    // Generate random hex digit (0-9, a-f)
-    uint8_t randomByte = random(16);
-    if (randomByte < 10) {
-      uuid += String(randomByte);
-    } else {
-      uuid += char('a' + randomByte - 10);
-    }
-  }
-
-  return uuid;
-}

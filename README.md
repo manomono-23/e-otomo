@@ -186,7 +186,7 @@ cd otomo-e
 
 - **メインファームウェア**: [otomo-e](https://github.com/manomono-23/otomo-e) (このリポジトリ)
 - **Webアプリケーション**: [otomo-e-web](https://github.com/manomono-23/otomo-e-web)
-- **ライブデモ**: [art-frame.manomono.net](http://art-frame.manomono.net/)
+- **画像データ送信ツール**: [art-frame.manomono.net](http://art-frame.manomono.net/)
 
 ## リンク
 
