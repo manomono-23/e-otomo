@@ -652,10 +652,10 @@ void showWelcomeMessage() {
 }
 
 void drawQRCode() {
-  // QR Code parameters - larger display with device ID at top
-  const uint8_t qr_scale = 6;  // Larger scale (33*6=198)
-  const uint8_t qr_x = (200 - 198) / 2;  // Center horizontally (1px margin)
-  const uint8_t qr_y = 10;     // Y position close to device ID
+  // QR Code parameters - medium size display with device ID at top
+  const uint8_t qr_scale = 5;  // Medium scale (33*5=165)
+  const uint8_t qr_x = (200 - 165) / 2;  // Center horizontally (17px margin)
+  const uint8_t qr_y = 15;     // Y position below device ID
 
 
   // Draw the QR code
