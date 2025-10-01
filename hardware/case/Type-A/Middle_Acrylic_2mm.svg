@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_x30_" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 200 200">
+  <!-- Generator: Adobe Illustrator 29.8.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 2)  -->
+  <defs>
+    <style>
+      .st0 {
+        stroke: red;
+      }
+
+      .st0, .st1 {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: .7px;
+      }
+
+      .st1 {
+        stroke: #000;
+      }
+    </style>
+  </defs>
+  <g id="LWPOLYLINE">
+    <rect class="st1" x="23.5" y="43" width="120.5" height="114"/>
+  </g>
+  <g id="CIRCLE">
+    <circle class="st1" cx="29.7" cy="38.1" r="3.3"/>
+  </g>
+  <g id="CIRCLE1" data-name="CIRCLE">
+    <circle class="st1" cx="153.5" cy="38.1" r="3.3"/>
+  </g>
+  <g id="CIRCLE2" data-name="CIRCLE">
+    <circle class="st1" cx="29.7" cy="161.9" r="3.3"/>
+  </g>
+  <g id="CIRCLE3" data-name="CIRCLE">
+    <circle class="st1" cx="153.5" cy="161.9" r="3.3"/>
+  </g>
+  <g id="LWPOLYLINE1" data-name="LWPOLYLINE">
+    <path class="st0" d="M165.2,117.7c9.8,0,17.7-7.9,17.7-17.7s-7.9-17.7-17.7-17.7v-41.7c0-7.8-6.3-14.2-14.2-14.2H32.3c-7.8,0-14.2,6.3-14.2,14.2v118.8c0,7.8,6.3,14.2,14.2,14.2h118.8c7.8,0,14.2-6.3,14.2-14.2v-41.7Z"/>
+  </g>
+  <g id="LWPOLYLINE2" data-name="LWPOLYLINE">
+    <path class="st1" d="M165.2,107.8v-15.6c4.3,0,7.8,3.5,7.8,7.8s-3.5,7.8-7.8,7.8Z"/>
+  </g>
+</svg>
