@@ -11,11 +11,11 @@
 
 // ========== CONFIGURATION ==========
 // Display type selection (uncomment one)
-// #define DISPLAY_2COLOR  // 2-color display (Black/White)
- #define DISPLAY_3COLOR  // 3-color display (Black/White/Red)
+ #define DISPLAY_2COLOR  // 2-color display (Black/White)
+// #define DISPLAY_3COLOR  // 3-color display (Black/White/Red)
 
 // Device ID (change this for each device)
-#define DEVICE_ID "0002"
+#define DEVICE_ID "0019"
 
 /**
  * Pin Configuration:
@@ -241,9 +241,9 @@ void setupBluetooth() {
   // Set device name with unique ID
   String deviceName;
 #ifdef DISPLAY_2COLOR
-  deviceName = "Otomoe2C " + String(DEVICE_ID);
+  deviceName = "e-Otomo-2C " + String(DEVICE_ID);
 #elif defined(DISPLAY_3COLOR)
-  deviceName = "Otomoe3C " + String(DEVICE_ID);
+  deviceName = "e-Otomo-3C " + String(DEVICE_ID);
 #else
   #error "Please define either DISPLAY_2COLOR or DISPLAY_3COLOR"
 #endif
@@ -290,7 +290,9 @@ void setupBluetooth() {
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addService(aiStickyService);
-  Bluefruit.Advertising.addName();
+
+  // 名前はスキャンレスポンスに入れる
+  Bluefruit.ScanResponse.addName();
   
   // Start advertising
   Bluefruit.Advertising.start(0); // 0 = Don't stop advertising
@@ -318,9 +320,7 @@ void drawingDataWriteCallback(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t
 
 
 void processDrawingData() {
-  Serial.println("Converting drawing data to display format with 180-degree rotation...");
-
-  display.setRotation(2);  // 180-degree rotation
+  display.setRotation(0);
   display.setFullWindow();
   display.firstPage();
 
@@ -375,8 +375,6 @@ void processDrawingData() {
   } while (display.nextPage());
 
   display.hibernate();
-
-  Serial.println("Drawing data displayed on e-paper with 180-degree rotation");
 
   // Enter deep sleep immediately after drawing completion
   Serial.println("Drawing complete - entering deep sleep...");
@@ -606,7 +604,7 @@ void processCommand(uint8_t* data, size_t length) {
 void showWelcomeMessage() {
   Serial.println("Showing welcome message with QR code...");
 
-  display.setRotation(2);  // 180-degree rotation
+  display.setRotation(0);
   display.setFullWindow();
   display.firstPage();
 
