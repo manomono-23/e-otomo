@@ -68,7 +68,7 @@ e-Otomo（えおとも）は、nRF52840を使用したデバイスで、Bluetoot
 
 - **技術**: HTML5, CSS3, JavaScript (WebBluetooth API)
 - **リポジトリ**: [e-Otomo Web Interface](https://github.com/manomono-23/e-otomo-web)
-- **ライブデモ**: [art-frame.manomono.net](http://art-frame.manomono.net/)
+- **ライブデモ**: [e-otomo.manomono.net](http://e-otomo.manomono.net/)
 - **機能**:
   - 写真選択とプレビュー
   - 複数の描画モード
@@ -86,7 +86,7 @@ e-Otomo（えおとも）は、nRF52840を使用したデバイスで、Bluetoot
 
 ### 単発送信モード - 1枚の写真を送信
 
-1. **Webアプリを開く**: ブラウザで http://art-frame.manomono.net/ にアクセス
+1. **Webアプリを開く**: ブラウザで http://e-otomo.manomono.net/ にアクセス
 2. **モード選択**: 「今すぐ1枚送信」タブを選択
 3. **写真を選択**: 「写真を選択」ボタンをクリックして表示したい写真を選ぶ
 4. **描画モード選択**: 4種類の描画モードから好みのスタイルを選択
@@ -195,7 +195,7 @@ e-Otomo（えおとも）は、nRF52840を使用したデバイスで、Bluetoot
 
 - **メインファームウェア**: [e-Otomo](https://github.com/manomono-23/e-otomo) (このリポジトリ)
 - **Webアプリケーション**: [e-Otomo-web](https://github.com/manomono-23/e-otomo-web)
-- **画像データ送信ツール**: [art-frame.manomono.net](http://art-frame.manomono.net/)
+- **画像データ送信ツール**: [e-otomo.manomono.net](http://e-otomo.manomono.net/)
 
 ## リンク
 
