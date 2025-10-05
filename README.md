@@ -17,7 +17,9 @@ e-Otomo（えおとも）は、nRF52840を使用したデバイスで、Bluetoot
 ### 必要な部品
 
 - **マイコン**: Seeed Studio XIAO nRF52840
-- **ディスプレイ**: Waveshare 1.54inch e-Paper Module (3色: 白・黒・赤 / 2色: 白・黒)
+- **ディスプレイ**:
+  - 3色（白・黒・赤）: [Waveshare 1.54inch e-Paper Module B](https://www.waveshare.com/1.54inch-e-Paper-B.htm)
+  - 2色（白・黒）: [1.54" 200x200 E-Ink Display Panel #-765](https://buyepaper.com/products/-765)
 - **電源**: CR2032電池
 
 ### ピン配置
