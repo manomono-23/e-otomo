@@ -185,7 +185,13 @@ e-Otomo（えおとも）は、nRF52840を使用したデバイスで、Bluetoot
 
 ## ライセンス
 
-このプロジェクトは MIT License の下でライセンスされています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
+このプロジェクトは Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License の下でライセンスされています。
+
+- **非商用利用のみ**: 商用目的での使用は禁止されています
+- **表示**: 適切なクレジット表記が必要です
+- **継承**: 改変版も同じライセンスで配布する必要があります
+
+詳細は [LICENSE](LICENSE) ファイルまたは https://creativecommons.org/licenses/by-nc-sa/4.0/ を参照してください。
 
 ## 謝辞
 
