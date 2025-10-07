@@ -17,6 +17,7 @@ Thumbs.db
 *.kicad_prl
 fp-info-cache
 *.step.tmp
+*.lck
 
 # KiCad production files (keep only essential ones)
 production/
