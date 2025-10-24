@@ -43,6 +43,8 @@
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include <SPI.h>
 #include <bluefruit.h>
+#include <nrf.h>
+#include <stdio.h>
 #include "qr_pattern.h"
 
 // Pin definitions for nRF52840
@@ -130,6 +132,7 @@ const char* DISPLAY_CHARACTERISTIC_UUID = "87654321-4321-8765-cba9-987654321abd"
 const char* ACTIVE_SERVICE_UUID;
 const char* ACTIVE_CHARACTERISTIC_UUID;
 
+String ficrIdentifier;
 
 // Function prototypes
 void setupBluetooth();
@@ -142,12 +145,25 @@ bool checkLongPress();
 void drawingDataWriteCallback(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t len);
 void decompressRLEData(uint8_t* compressedData, size_t dataLength, uint16_t expectedLength);
 void decompressRLEToDrawingData(uint8_t* rleData, size_t dataLength, uint8_t displayMode);
+void drawQRCode(int16_t topMargin);
+String getFICRIdentifier();
+
+String getFICRIdentifier() {
+  uint32_t deviceId0 = NRF_FICR->DEVICEID[0];
+  uint32_t deviceId1 = NRF_FICR->DEVICEID[1];
+  char buffer[17];
+  snprintf(buffer, sizeof(buffer), "%08lX%08lX", static_cast<unsigned long>(deviceId0), static_cast<unsigned long>(deviceId1));
+  return String(buffer);
+}
 
 void setup() {
   // Serial.begin(115200);
   // while (!Serial) delay(10);
 
   Serial.println("=== AI Sticky Note for nRF52840 ===");
+
+  ficrIdentifier = getFICRIdentifier();
+  Serial.printf("FICR Device ID: %s\n", ficrIdentifier.c_str());
 
   // Signal wake up from deep sleep with LED pattern
   wakeUpSignal();
@@ -281,6 +297,10 @@ void setupBluetooth() {
 #else
   #error "Please define one of: DISPLAY_2COLOR, DISPLAY_3COLOR, or DISPLAY_4COLOR"
 #endif
+  if (ficrIdentifier.length() > 0) {
+    deviceName += "-";
+    deviceName += ficrIdentifier;
+  }
 
   Bluefruit.setName(deviceName.c_str());
   Serial.printf("BLE Device Name: %s\n", deviceName.c_str());
@@ -691,11 +711,16 @@ void showWelcomeMessage() {
     display.fillScreen(GxEPD_WHITE);
 
     // Setup font for any text drawing
-    display.setFont(&FreeMonoBold9pt7b);
     display.setTextColor(GxEPD_BLACK);
+    display.setFont(NULL);
+    if (ficrIdentifier.length() > 0) {
+      display.setCursor(45, 8);
+      display.print("0x");
+      display.print(ficrIdentifier);
+    }
 
-    // Draw QR code (start at y=10)
-    drawQRCode();
+    // Draw QR code slightly lower to make space for FICR information
+    drawQRCode(15);
 
     // Draw color stripe at bottom (195-200, full width) - different for each display type
     for (int x = 0; x < 200; x++) {
@@ -737,11 +762,11 @@ void showWelcomeMessage() {
   Serial.println("Welcome message with QR code displayed");
 }
 
-void drawQRCode() {
+void drawQRCode(int16_t topMargin) {
   // QR Code parameters - medium size display
   const uint8_t qr_scale = 5;  // Medium scale (33*5=165)
   const uint8_t qr_x = (200 - 165) / 2;  // Center horizontally (17px margin)
-  const uint8_t qr_y = 10;     // Y position at top
+  const int16_t qr_y = topMargin;     // Y position at top
 
 
   // Draw the QR code
@@ -925,4 +950,3 @@ void decompressRLEToDrawingData(uint8_t* rleData, size_t dataLength, uint8_t dis
 
   Serial.printf("RLE decompressed %d pixels from %d bytes\n", pixelIndex, dataLength);
 }
-
