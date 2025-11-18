@@ -38,6 +38,13 @@ e-Otomo（えおとも）は、nRF52840を使用したデバイスで、Bluetoot
 | D0       | 赤色LED | ステータス表示 |
 | LED_BLUE | 青色LED（内蔵） | ディープスリープ表示 |
 
+## リリース・バージョン
+
+### 主要リリース
+
+- **[v1.0.1-booth-new-release](https://github.com/manomono-23/e-otomo/tree/v1.0.1-booth-new-release)**: Booth出品バージョン
+- **[v1.0.0-mft2025](https://github.com/manomono-23/e-otomo/tree/v1.0.0-mft2025)**: Maker Faire Tokyo 2025出品バージョン
+
 ## ハードウェア設計
 
 ### PCB設計
@@ -49,9 +56,16 @@ e-Otomo（えおとも）は、nRF52840を使用したデバイスで、Bluetoot
 ### 筐体設計
 
 - **3Dモデル**: `hardware/case/*`
+- **寸法**: 51.9 x 51.9 x 10.7mm
 - **材質**: PLA推奨
 - **透明アクリル**: `hardware/case/Middle_Acrylic_2mm.svg`（ディスプレイカバー用）
 - **透明アクリル**: `hardware/case/Panel_Acrylic_1mm.svg`（ケース中間層用）
+
+### 注意点
+
+⚠️ **3Dプリンター製作時の注意**
+- 筐体は3Dプリンターで製作するため、個体によって寸法にばらつきがある場合があります
+- 部品の嵌合具合を確認し、必要に応じてやすりがけなどで調整してください
 
 ## ソフトウェア構成
 
