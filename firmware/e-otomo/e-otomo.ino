@@ -11,11 +11,11 @@
 
 // ========== CONFIGURATION ==========
 // Display type selection (uncomment one)
- #define DISPLAY_2COLOR  // 2-color display (Black/White)
-// #define DISPLAY_3COLOR  // 3-color display (Black/White/Red)
+// #define DISPLAY_2COLOR  // 2-color display (Black/White)
+#define DISPLAY_3COLOR  // 3-color display (Black/White/Red)
+// #define DISPLAY_4COLOR  // 4-color display (Black/White/Yellow/Red)
 
-// Device ID (change this for each device)
-#define DEVICE_ID "0019"
+// Device ID removed - no longer needed
 
 /**
  * Pin Configuration:
@@ -36,11 +36,15 @@
   #include <GxEPD2_BW.h>  // 2-color display library
 #elif defined(DISPLAY_3COLOR)
   #include <GxEPD2_3C.h>  // 3-color display library
+#elif defined(DISPLAY_4COLOR)
+  #include <GxEPD2_4C.h>  // 4-color display library
 #endif
 
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include <SPI.h>
 #include <bluefruit.h>
+#include <nrf.h>
+#include <stdio.h>
 #include "qr_pattern.h"
 
 // Pin definitions for nRF52840
@@ -59,6 +63,9 @@
 #elif defined(DISPLAY_3COLOR)
   // 3-color display (Black/White/Red)
   GxEPD2_3C<GxEPD2_154_Z90c, GxEPD2_154_Z90c::HEIGHT> display(GxEPD2_154_Z90c(CS_PIN, DC_PIN, RST_PIN, BUSY_PIN));
+#elif defined(DISPLAY_4COLOR)
+  // 4-color display (Black/White/Yellow/Red) - GDEM0154F51H
+  GxEPD2_4C<GxEPD2_154c_GDEM0154F51H, GxEPD2_154c_GDEM0154F51H::HEIGHT> display(GxEPD2_154c_GDEM0154F51H(CS_PIN, DC_PIN, RST_PIN, BUSY_PIN));
 #endif
 
 // LED control variables
@@ -75,8 +82,10 @@ const unsigned long LED_OFF_TIME = 2000;  // LEDを消灯する時間(ms)
 const unsigned long LONG_PRESS_THRESHOLD = 1500;   // 長押し判定時間(ms)
 
 // Bluetooth Low Energy
-BLEService aiStickyService;
-BLECharacteristic drawingDataChar;
+BLEService deviceNameService;        // Service for device name identification
+BLEService displayCapabilityService; // Service for display capability identification
+BLECharacteristic deviceNameChar;    // Characteristic for device name service
+BLECharacteristic drawingDataChar;   // Characteristic for drawing data
 
 // Command types
 #define CMD_DRAW_DATA     0x01
@@ -97,6 +106,7 @@ uint8_t compressedDataBuffer[8192]; // Buffer for compressed data
 uint16_t compressedDataReceived = 0;
 uint16_t expectedCompressedLength = 0;
 bool compressedDataInProgress = false;
+uint8_t compressedDisplayMode = 4; // Default to 4-color mode
 
 // RLE compressed data handling
 uint8_t rleDataBuffer[8192]; // Buffer for RLE compressed data
@@ -105,10 +115,24 @@ uint16_t expectedRLELength = 0;
 bool rleDataInProgress = false;
 uint8_t rleDisplayMode = 4; // Default to 4-color mode
 
-// BLE Service and Characteristic UUIDs (Fixed)
-const char* SERVICE_UUID = "12345678-1234-5678-9abc-123456789abd";
-const char* CHARACTERISTIC_UUID = "87654321-4321-8765-cba9-987654321abd";
+// BLE Service and Characteristic UUIDs
+// Legacy device name identification service 
+const char* DEVICE_NAME_SERVICE_UUID = "12345678-1234-5678-9abc-123456789abd";
+const char* DEVICE_NAME_CHARACTERISTIC_UUID = "87654321-4321-8765-cba9-987654321abd";
 
+// Display-specific Service UUIDs for color capability identification
+const char* DISPLAY_2COLOR_SERVICE_UUID = "11111111-2222-3333-4444-555555555555";
+const char* DISPLAY_3COLOR_SERVICE_UUID = "22222222-3333-4444-5555-666666666666";
+const char* DISPLAY_4COLOR_SERVICE_UUID = "33333333-4444-5555-6666-777777777777";
+
+// Unified Characteristic UUID for all display types
+const char* DISPLAY_CHARACTERISTIC_UUID = "87654321-4321-8765-cba9-987654321abd";
+
+// Current active UUIDs (will be set based on display type)
+const char* ACTIVE_SERVICE_UUID;
+const char* ACTIVE_CHARACTERISTIC_UUID;
+
+String ficrIdentifier;
 
 // Function prototypes
 void setupBluetooth();
@@ -121,12 +145,25 @@ bool checkLongPress();
 void drawingDataWriteCallback(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t len);
 void decompressRLEData(uint8_t* compressedData, size_t dataLength, uint16_t expectedLength);
 void decompressRLEToDrawingData(uint8_t* rleData, size_t dataLength, uint8_t displayMode);
+void drawQRCode(int16_t topMargin);
+String getFICRIdentifier();
+
+String getFICRIdentifier() {
+  uint32_t deviceId0 = NRF_FICR->DEVICEID[0];
+  uint32_t deviceId1 = NRF_FICR->DEVICEID[1];
+  char buffer[17];
+  snprintf(buffer, sizeof(buffer), "%08lX%08lX", static_cast<unsigned long>(deviceId0), static_cast<unsigned long>(deviceId1));
+  return String(buffer);
+}
 
 void setup() {
   // Serial.begin(115200);
   // while (!Serial) delay(10);
 
   Serial.println("=== AI Sticky Note for nRF52840 ===");
+
+  ficrIdentifier = getFICRIdentifier();
+  Serial.printf("FICR Device ID: %s\n", ficrIdentifier.c_str());
 
   // Signal wake up from deep sleep with LED pattern
   wakeUpSignal();
@@ -168,10 +205,21 @@ void setup() {
     Serial.println("Short press detected - skipping display update");
   }
   
+  // Set active UUIDs based on display type
+#ifdef DISPLAY_2COLOR
+  ACTIVE_SERVICE_UUID = DISPLAY_2COLOR_SERVICE_UUID;
+#elif defined(DISPLAY_3COLOR)
+  ACTIVE_SERVICE_UUID = DISPLAY_3COLOR_SERVICE_UUID;
+#elif defined(DISPLAY_4COLOR)
+  ACTIVE_SERVICE_UUID = DISPLAY_4COLOR_SERVICE_UUID;
+#endif
+  // Characteristic UUID is unified for all display types
+  ACTIVE_CHARACTERISTIC_UUID = DISPLAY_CHARACTERISTIC_UUID;
+
   Serial.println("Device initialization:");
-  Serial.printf("Device ID: %s\n", DEVICE_ID);
-  Serial.printf("Service UUID: %s\n", SERVICE_UUID);
-  Serial.printf("Characteristic UUID: %s\n", CHARACTERISTIC_UUID);
+  Serial.printf("Device Name Service UUID: %s\n", DEVICE_NAME_SERVICE_UUID);
+  Serial.printf("Active Display Service UUID: %s\n", ACTIVE_SERVICE_UUID);
+  Serial.printf("Active Characteristic UUID: %s\n", ACTIVE_CHARACTERISTIC_UUID);
 
   // Setup Bluetooth
   setupBluetooth();
@@ -238,15 +286,21 @@ void setupBluetooth() {
 
   // Initialize Bluefruit with maximum performance configuration
   Bluefruit.begin();
-  // Set device name with unique ID
+  // Set device name based on display type
   String deviceName;
 #ifdef DISPLAY_2COLOR
-  deviceName = "e-Otomo-2C " + String(DEVICE_ID);
+  deviceName = "e-Otomo-2C";
 #elif defined(DISPLAY_3COLOR)
-  deviceName = "e-Otomo-3C " + String(DEVICE_ID);
+  deviceName = "e-Otomo-3C";
+#elif defined(DISPLAY_4COLOR)
+  deviceName = "e-Otomo-4C";
 #else
-  #error "Please define either DISPLAY_2COLOR or DISPLAY_3COLOR"
+  #error "Please define one of: DISPLAY_2COLOR, DISPLAY_3COLOR, or DISPLAY_4COLOR"
 #endif
+  if (ficrIdentifier.length() > 0) {
+    deviceName += "-";
+    deviceName += ficrIdentifier;
+  }
 
   Bluefruit.setName(deviceName.c_str());
   Serial.printf("BLE Device Name: %s\n", deviceName.c_str());
@@ -272,12 +326,24 @@ void setupBluetooth() {
   // Request 2M PHY for higher throughput (if supported)
   // Note: PHY switching is handled automatically by the BLE stack
   
-  // Configure and start the BLE service with compile-time UUID
-  aiStickyService = BLEService(BLEUuid(SERVICE_UUID));
-  aiStickyService.begin();
+  // Configure and start the device name identification service
+  deviceNameService = BLEService(BLEUuid(DEVICE_NAME_SERVICE_UUID));
+  deviceNameService.begin();
 
-  // Configure the drawing data characteristic with compile-time UUID
-  drawingDataChar = BLECharacteristic(BLEUuid(CHARACTERISTIC_UUID));
+  // Configure the device name characteristic (for backward compatibility)
+  deviceNameChar = BLECharacteristic(BLEUuid(DEVICE_NAME_CHARACTERISTIC_UUID));
+  deviceNameChar.setProperties(CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP);
+  deviceNameChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+  deviceNameChar.setMaxLen(244);
+  deviceNameChar.setWriteCallback(drawingDataWriteCallback);
+  deviceNameChar.begin();
+
+  // Configure and start the display capability specific service
+  displayCapabilityService = BLEService(BLEUuid(ACTIVE_SERVICE_UUID));
+  displayCapabilityService.begin();
+
+  // Configure the drawing data characteristic with display-specific UUID
+  drawingDataChar = BLECharacteristic(BLEUuid(ACTIVE_CHARACTERISTIC_UUID));
   drawingDataChar.setProperties(CHR_PROPS_WRITE | CHR_PROPS_WRITE_WO_RESP);
   drawingDataChar.setPermission(SECMODE_OPEN, SECMODE_OPEN);
   drawingDataChar.setMaxLen(244); // Use BLE 4.2 maximum (244 bytes payload + 3 bytes header = 247)
@@ -289,7 +355,9 @@ void setupBluetooth() {
   // Setup advertising
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
-  Bluefruit.Advertising.addService(aiStickyService);
+  // Advertise both services for compatibility and capability detection
+  Bluefruit.Advertising.addService(deviceNameService);
+  Bluefruit.Advertising.addService(displayCapabilityService);
 
   // 名前はスキャンレスポンスに入れる
   Bluefruit.ScanResponse.addName();
@@ -298,8 +366,9 @@ void setupBluetooth() {
   Bluefruit.Advertising.start(0); // 0 = Don't stop advertising
   
   Serial.println("Bluetooth LE advertising started");
-  Serial.printf("Service UUID: %s\n", SERVICE_UUID);
-  Serial.printf("Characteristic UUID: %s\n", CHARACTERISTIC_UUID);
+  Serial.printf("Device Name Service UUID: %s\n", DEVICE_NAME_SERVICE_UUID);
+  Serial.printf("Display Capability Service UUID: %s\n", ACTIVE_SERVICE_UUID);
+  Serial.printf("Active Characteristic UUID: %s\n", ACTIVE_CHARACTERISTIC_UUID);
   Serial.println("Waiting for client connection...");
 }
 
@@ -344,7 +413,7 @@ void processDrawingData() {
         }
       }
     }
-#else
+#elif defined(DISPLAY_3COLOR)
     // 3-color mode: 2 bits per pixel (00=white, 01=black, 10=red)
     for (int y = 0; y < 200; y++) {
       for (int x = 0; x < 200; x++) {
@@ -360,6 +429,35 @@ void processDrawingData() {
               display.drawPixel(x, y, GxEPD_BLACK);
               break;
             case 0x02: // Red
+              display.drawPixel(x, y, GxEPD_RED);
+              break;
+            case 0x00: // White (default)
+            default:
+              // Already white from fillScreen
+              break;
+          }
+        }
+      }
+    }
+#elif defined(DISPLAY_4COLOR)
+    // 4-color mode: 2 bits per pixel (00=white, 01=black, 10=yellow, 11=red)
+    for (int y = 0; y < 200; y++) {
+      for (int x = 0; x < 200; x++) {
+        int pixelIndex = y * 200 + x;
+        int byteIndex = pixelIndex / 4;
+        int bitOffset = (pixelIndex % 4) * 2;
+
+        if (byteIndex < sizeof(drawingData)) {
+          uint8_t pixelValue = (drawingData[byteIndex] >> bitOffset) & 0x03;
+
+          switch (pixelValue) {
+            case 0x01: // Black
+              display.drawPixel(x, y, GxEPD_BLACK);
+              break;
+            case 0x02: // Yellow
+              display.drawPixel(x, y, GxEPD_YELLOW);
+              break;
+            case 0x03: // Red
               display.drawPixel(x, y, GxEPD_RED);
               break;
             case 0x00: // White (default)
@@ -424,7 +522,7 @@ void processCommand(uint8_t* data, size_t length) {
     if (compressedDataReceived >= expectedCompressedLength) {
       // All compressed data received, now decompress
       Serial.println("All compressed data received, decompressing...");
-      decompressRLEData(compressedDataBuffer, compressedDataReceived, expectedCompressedLength);
+      decompressRLEToDrawingData(compressedDataBuffer, compressedDataReceived, compressedDisplayMode);
       
       newDataReceived = true;
       compressedDataInProgress = false;
@@ -457,7 +555,7 @@ void processCommand(uint8_t* data, size_t length) {
 #ifdef DISPLAY_2COLOR
     int expectedDataSize = 5000;  // 200*200/8 = 5000 bytes for 2-color
 #else
-    int expectedDataSize = 10000; // 200*200*2/8 = 10000 bytes for 3-color
+    int expectedDataSize = 10000; // 200*200*2/8 = 10000 bytes for 3-color and 4-color
 #endif
 
     if (dataReceiveOffset >= expectedDataSize) {
@@ -541,20 +639,21 @@ void processCommand(uint8_t* data, size_t length) {
       // Start of compressed data transfer
       Serial.println("Starting compressed data reception");
       
-      if (length >= 3) {
-        expectedCompressedLength = data[1] | (data[2] << 8);
-        Serial.printf("Expected compressed data length: %d bytes\n", expectedCompressedLength);
+      if (length >= 4) {
+        compressedDisplayMode = data[1]; // Extract display mode
+        expectedCompressedLength = data[2] | (data[3] << 8);
+        Serial.printf("Expected compressed data length: %d bytes, Display mode: %d\n", expectedCompressedLength, compressedDisplayMode);
         
         // Reset compressed data reception
         compressedDataReceived = 0;
         compressedDataInProgress = true;
         displayUpdating = true;
         
-        // Copy any payload in the first packet (after 3-byte header)
-        if (length > 3) {
-          size_t firstChunkLen = length - 3;
+        // Copy any payload in the first packet (after 4-byte header)
+        if (length > 4) {
+          size_t firstChunkLen = length - 4;
           if (firstChunkLen <= sizeof(compressedDataBuffer)) {
-            memcpy(compressedDataBuffer, data + 3, firstChunkLen);
+            memcpy(compressedDataBuffer, data + 4, firstChunkLen);
             compressedDataReceived = firstChunkLen;
             Serial.printf("First chunk: %d bytes\n", (int)firstChunkLen);
           }
@@ -563,7 +662,7 @@ void processCommand(uint8_t* data, size_t length) {
         // Check if all data received in first packet
         if (compressedDataReceived >= expectedCompressedLength) {
           Serial.println("All data in first packet, decompressing...");
-          decompressRLEData(compressedDataBuffer, compressedDataReceived, expectedCompressedLength);
+          decompressRLEToDrawingData(compressedDataBuffer, compressedDataReceived, compressedDisplayMode);
           
           newDataReceived = true;
           compressedDataInProgress = false;
@@ -611,35 +710,49 @@ void showWelcomeMessage() {
   do {
     display.fillScreen(GxEPD_WHITE);
 
-    // Draw device ID at top center in black
-    display.setFont(&FreeMonoBold9pt7b);
+    // Setup font for any text drawing
     display.setTextColor(GxEPD_BLACK);
+    display.setFont(NULL);
+    if (ficrIdentifier.length() > 0) {
+      display.setCursor(45, 8);
+      display.print("0x");
+      display.print(ficrIdentifier);
+    }
 
-    // Calculate center position for device ID
-    String deviceId = String(DEVICE_ID);
-    int16_t tbx, tby; uint16_t tbw, tbh;
-    display.getTextBounds(deviceId.c_str(), 0, 0, &tbx, &tby, &tbw, &tbh);
-    int16_t x = (200 - tbw) / 2;
-    int16_t y = 20; // Top margin
+    // Draw QR code slightly lower to make space for FICR information
+    drawQRCode(15);
 
-    display.setCursor(x, y);
-    display.print(deviceId);
-
-    // Draw QR code moved down (start at y=30)
-    drawQRCode();
-
-    // Draw 3-color stripe at bottom (195-200, full width)
+    // Draw color stripe at bottom (195-200, full width) - different for each display type
     for (int x = 0; x < 200; x++) {
       for (int y = 195; y < 200; y++) {
-        if (x < 67) {
-          display.drawPixel(x, y, GxEPD_BLACK);  // Black stripe
-        } else if (x < 134) {
+#ifdef DISPLAY_2COLOR
+        // 2-color: 2 equal sections (100px each) - White | Black
+        if (x < 100) {
           // White stripe (default background, no drawing needed)
         } else {
-#ifdef DISPLAY_3COLOR
-          display.drawPixel(x, y, GxEPD_RED);    // Red stripe (3-color only)
-#endif
+          display.drawPixel(x, y, GxEPD_BLACK);  // Black stripe
         }
+#elif defined(DISPLAY_3COLOR)
+        // 3-color: 3 equal sections (67px each) - White | Black | Red
+        if (x < 67) {
+          // White stripe (default background, no drawing needed)
+        } else if (x < 134) {
+          display.drawPixel(x, y, GxEPD_BLACK);  // Black stripe
+        } else {
+          display.drawPixel(x, y, GxEPD_RED);    // Red stripe
+        }
+#elif defined(DISPLAY_4COLOR)
+        // 4-color: 4 equal sections (50px each) - White | Black | Red | Yellow
+        if (x < 50) {
+          // White stripe (default background, no drawing needed)
+        } else if (x < 100) {
+          display.drawPixel(x, y, GxEPD_BLACK);  // Black stripe
+        } else if (x < 150) {
+          display.drawPixel(x, y, GxEPD_RED);    // Red stripe
+        } else {
+          display.drawPixel(x, y, GxEPD_YELLOW); // Yellow stripe
+        }
+#endif
       }
     }
 
@@ -649,11 +762,11 @@ void showWelcomeMessage() {
   Serial.println("Welcome message with QR code displayed");
 }
 
-void drawQRCode() {
-  // QR Code parameters - medium size display with device ID at top
+void drawQRCode(int16_t topMargin) {
+  // QR Code parameters - medium size display
   const uint8_t qr_scale = 5;  // Medium scale (33*5=165)
   const uint8_t qr_x = (200 - 165) / 2;  // Center horizontally (17px margin)
-  const uint8_t qr_y = 15;     // Y position below device ID
+  const int16_t qr_y = topMargin;     // Y position at top
 
 
   // Draw the QR code
@@ -837,4 +950,3 @@ void decompressRLEToDrawingData(uint8_t* rleData, size_t dataLength, uint8_t dis
 
   Serial.printf("RLE decompressed %d pixels from %d bytes\n", pixelIndex, dataLength);
 }
-
